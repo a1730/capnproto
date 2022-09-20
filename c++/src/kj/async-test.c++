@@ -378,6 +378,9 @@ TEST(Async, SeparateFulfillerVoid) {
 }
 
 TEST(Async, SeparateFulfillerCanceled) {
+  EventLoop loop;
+  WaitScope waitScope(loop);
+
   auto pair = newPromiseAndFulfiller<void>();
 
   EXPECT_TRUE(pair.fulfiller->isWaiting());
@@ -430,6 +433,9 @@ TEST(Async, SeparateFulfillerDiscardedDuringUnwind) {
 #endif
 
 TEST(Async, SeparateFulfillerMemoryLeak) {
+  EventLoop loop;
+  WaitScope waitScope(loop);
+
   auto paf = kj::newPromiseAndFulfiller<void>();
   paf.fulfiller->fulfill();
 }
@@ -1639,6 +1645,21 @@ KJ_TEST("constPromise") {
   Promise<int> p = constPromise<int, 123>();
   int i = p.wait(waitScope);
   KJ_EXPECT(i == 123);
+}
+
+kj::Promise<uint> asyncAccumulate(uint z, uint ttl) {
+  if (ttl == 0) return z;
+  z += ttl;
+  return evalLater([z, ttl]() {
+    return asyncAccumulate(z, ttl - 1);
+  });
+}
+
+KJ_TEST("benchmark: Pre-environment evalLater()") {
+  EventLoop eventLoop;
+  WaitScope waitScope(eventLoop);
+
+  asyncAccumulate(0, 10'000'000).wait(waitScope);
 }
 
 }  // namespace
